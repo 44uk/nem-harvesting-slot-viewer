@@ -1,0 +1,117 @@
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>NEMHarvestingSlotViewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
+<link rel="stylesheet" href="http://cdn.rawgit.com/necolas/normalize.css/master/normalize.css">
+<link rel="stylesheet" href="http://cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css">
+</head>
+<body style="padding-top:1rem;padding-bottom:1rem">
+<div class="container">
+<div class="row">
+<div class="column">
+<h1>NEMHarvestingSlotViewer</h1>
+</div>
+<div class="column" style="text-align:right">
+<button id="reload" class="button">Reload</button>
+</div>
+</div>
+<div class="row">
+<div class="column">
+<table>
+<thead><tr><th>Host</th><th>FreeSlots</th></tr></thead>
+<tbody id="mount"></tbody>
+</table>
+</div>
+</div>
+<div class="row">
+<div class="column">
+  <p>Author: <a href="https://twitter.com/44uk_i3" target="_blank">@44uk_i3</a></p>
+</div>
+</div>
+</div>
+<script>
+(function() {
+  var TIMEOUT = 300;
+  var RATIO   = 0.05;
+
+  // quoted from http://d.hatena.ne.jp/murky-satyr/20080608/1212864205
+  function shuffle(a, n) { // Fisher-Yates
+    var r = a.concat(), l = r.length, n = n < l ? n : l, i = l, j, t;
+    for(i = l; i;) t = r[j = Math.random()*i--|0], r[j] = r[i], r[i] = t;
+    r.length = n;
+    return r;
+  }
+
+  function loading() {
+    // TODO
+  }
+
+  function loaded() {
+    // TODO
+  }
+
+  function refetch(elem) {
+    mount.innerHTML = null;
+    showAvailableNodes(elem);
+  }
+
+  function showAvailableNodes(elem) {
+    fetch('https://supernodes.nem.io/nodes')
+      .then(function(data) {
+        return data.json();
+      })
+      .then(function(json) {
+        var nodes = shuffle(json.nodes, ~~(json.nodeCount * RATIO));
+        return Promise.all(nodes.map(function(node) {
+          var url = 'http://' + node.ip + ':' + node.nisPort + '/account/unlocked/info';
+          return fetch(url, {method: 'POST', timeout: TIMEOUT})
+            .then(function(data){
+              return data.json();
+            })
+            .then(function(json) {
+              return {
+                host: node.ip,
+                free: json['max-unlocked'] - json['num-unlocked']
+              };
+            })
+            .catch(function(data){ return {}; })
+          ;
+        }));
+      })
+      .then(function(results) {
+        return results.filter(function(obj) {
+          return obj.free > 0;
+        }).sort(function(a, b) {
+          return b.free - a.free;
+        });
+      })
+      .then(function(results) {
+        results.map(function(obj) {
+          var tr = document.createElement('tr');
+          var hostTd = document.createElement('td');
+          var freeTd = document.createElement('td');
+          hostTd.innerText = obj.host;
+          freeTd.innerText = obj.free;
+          tr.appendChild(hostTd);
+          tr.appendChild(freeTd);
+          elem.appendChild(tr);
+        });
+      })
+      .catch(function(err) {
+        console.error(err);
+      })
+    ;
+  }
+
+  var mount = document.getElementById('mount');
+  var button = document.getElementById('reload');
+  showAvailableNodes(mount);
+  button.addEventListener('click', function(ev) {refetch(mount); }, false);
+}());
+</script>
+</body>
+</html>
