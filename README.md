@@ -6,7 +6,7 @@ Randomly selected nodes from https://supernodes.nem.io/nodes will be checked if 
 
 ## Demo
 
-- http://hydrographer-ape-87625.bitballoon.com/
+- http://nem-harvesting-slot-viewer.s3-website-ap-northeast-1.amazonaws.com/
 
 ## Usage
 
