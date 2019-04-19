@@ -3,33 +3,26 @@
 <meta charset="utf-8">
 <meta http-equiv="x-ua-compatible" content="ie=edge">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>nemHarvestingSlotViewer</title>
+<title>nem Harvesting Slot Viewer</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
-<link rel="stylesheet" href="http://cdn.rawgit.com/necolas/normalize.css/master/normalize.css">
-<link rel="stylesheet" href="http://cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css">
+<link rel="stylesheet" href="https://cdn.rawgit.com/necolas/normalize.css/master/normalize.css">
+<link rel="stylesheet" href="https://cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css">
+<script src="https://unpkg.com/hyperapp"></script>
 <style>
 a { color: #67b2e7; }
-.button, button, input[type='button'], input[type='reset'], input[type='submit'] { background-color: #f7a800; border: 0.1rem solid #f7a800; }
+.latest { font-weight: bold; }
 </style>
 </head>
 <body style="padding-top:1rem;padding-bottom:1rem">
 <div class="container">
 <div class="row">
 <div class="column">
-<h1 style="font-size: 98%">nemHarvestingSlotViewer</h1>
-</div>
-<div class="column" style="text-align:right">
-<button id="reload" class="button">Reload</button>
+<h1 style="font-size: 98%">nem Harvesting Slot Viewer</h1>
 </div>
 </div>
 <div class="row">
 <div class="column">
-<table style="font-size: 90%;">
-<thead><tr><th>Ver</th><th>Host</th><th>FreeSlots</th><th>Uptime(h)</th></tr></thead>
-<tbody id="mount" class="nodeinfo">
-</tbody>
-</table>
+<div id="app"></div>
 </div>
 </div>
 <div class="row">
@@ -43,117 +36,91 @@ Author: <a href="https://twitter.com/44uk_i3" target="_blank">@44uk_i3</a>
 </div>
 <script>
 (function() {
-  var TIMEOUT = 250;
-  var RATIO   = 0.07;
+  var TIMEOUT = 300;
+  var NODE_INFO_PATH = '/node/extended-info';
+  var UNLOCKED_INFO_PATH = '/account/unlocked/info';
 
-  // quoted from http://d.hatena.ne.jp/murky-satyr/20080608/1212864205
-  function shuffle(a, n) { // Fisher-Yates
-    var r = a.concat(), l = r.length, n = n < l ? n : l, i = l, j, t;
-    for(i = l; i;) t = r[j = Math.random()*i--|0], r[j] = r[i], r[i] = t;
-    r.length = n;
-    return r;
+  var h = window.hyperapp.h;
+  var app = window.hyperapp.app;
+  var state = { nodes: [], latestVer: '' };
+  var actions = {
+    append: function (node) { return function (_state) {
+      var newNodes = _state.nodes
+        .concat(node)
+        .sort(function (a, b) {
+          return a.ver === b.ver ?
+            b.freeSlots - a.freeSlots :
+            a.ver > b.ver ? -1 : 1
+          ;
+        })
+      ;
+      var latestVer = newNodes[0].ver;
+      return { nodes: newNodes, latestVer: latestVer };
+    }}
+  };
+
+  var view = function (state) {
+    return h('table', {
+      style: 'font-size:90%',
+    }, [
+      h('thead', {}, [
+        h('tr', {}, [
+          h('th', {}, 'Ver'),
+          h('th', {}, 'Host'),
+          h('th', {}, 'FreeSlots'),
+          h('th', {}, 'upTime(h)')
+        ])
+      ]),
+      h('tbody', {class: 'nodeinfo'}, [
+        state.nodes.map(function (node) {
+          var klass = node.ver === state.latestVer ? 'latest' : '';
+          return h('tr', {class: klass}, [
+            h('td', {}, node.ver),
+            h('td', {}, node.host),
+            h('td', {}, node.freeSlots),
+            h('td', {}, node.upTime)
+          ]);
+        }),
+      ]),
+    ]);
   }
-
-  function spinner() {
-    var tr = document.createElement('tr');
-    var td = document.createElement('td');
-    var img = document.createElement('img');
-    td.colSpan = 4;
-    td.style = 'text-align:center';
-    img.src = 'data:image/gif;base64,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';
-    td.appendChild(img);
-    tr.appendChild(td);
-    return tr;
-  }
-
-  function loading(elm) {
-    spinnerRef = spinnerRef || spinner();
-    elm.appendChild(spinnerRef);
-  }
-
-  function loaded(elm) {
-    elm.removeChild(spinnerRef);
-  }
-
-  function load(elem) {
-    mount.innerHTML = null;
-    loading(elem);
-    showAvailableNodes(elem);
-  }
-
-  function showAvailableNodes(elem) {
-    fetch('https://supernodes.nem.io/nodes')
-      .then(function(res) { return res.json(); })
-      .then(function(json) {
-        var nodes = shuffle(json.nodes, ~~(json.nodeCount * RATIO));
-        return Promise.all(nodes.map(function(node) {
-          var url = 'http://' + node.ip + ':' + node.nisPort;
-          var nodePath = '/node/extended-info';
-          var unlockedPath = '/account/unlocked/info';
-          return fetch(url + nodePath, {method: 'GET', timeout: TIMEOUT})
-            .then(function(res){ return res.json(); })
-            .then(function(json) {
-              return {
-                ver: json['nisInfo']['version'],
-                uptime: json['nisInfo']['currentTime'] - json['nisInfo']['startTime']
-              }
-            })
-            .then(function(info) {
-              return fetch(url + unlockedPath, {method: 'POST', timeout: TIMEOUT})
-                .then(function(res){ return res.json(); })
-                .then(function(json) {
-                  return {
-                    ver:  info.ver,
-                    host: node.ip,
-                    free: json['max-unlocked'] - json['num-unlocked'],
-                    uptime: ~~(info.uptime / 3600)
-                  };
-                })
-                .catch(function(data){ return false; })
-              ;
-            })
-            .catch(function(data){ return false; })
-        }));
-      })
-      .then(function(results) {
-        return results.filter(function(obj) {
-          return obj.free > 0;
-        }).sort(function(a, b) {
-          return b.free - a.free;
-        }).sort(function(a, b) {
-          return b.ver > a.ver ? 1 : -1;
-        });
-      })
-      .then(function(results) {
-        results.map(function(obj) {
-          var tr = document.createElement('tr');
-          var verTd  = document.createElement('td');
-          var hostTd = document.createElement('td');
-          var freeTd = document.createElement('td');
-          var uptimeTd = document.createElement('td');
-          verTd.innerText  = obj.ver;
-          hostTd.innerText = obj.host;
-          freeTd.innerText = obj.free;
-          uptimeTd.innerText = obj.uptime;
-          tr.appendChild(verTd);
-          tr.appendChild(hostTd);
-          tr.appendChild(freeTd);
-          tr.appendChild(uptimeTd);
-          elem.appendChild(tr);
-        });
-        loaded(mount);
-      })
-      .catch(function(err) {
-        console.error(err);
-      })
-    ;
-  }
-
-  var mount = document.getElementById('mount');
-  var button = document.getElementById('reload');
-  var spinnerRef = null;
-  button.addEventListener('click', function(ev) { load(mount); }, false);
-  load(mount);
+  var main = app(state, actions, view, document.querySelector('#app'));
+  window.__main = main;
+  fetch('https://supernodes.nem.io/nodes')
+    .then(function(res) { return res.json(); })
+    .then(function(json) {
+      console.log(json)
+      var nodes = json.nodes.filter(function (node) { return node.status === 1; })
+      nodes.forEach(function (node) {
+        var url = 'http://' + node.ip + ':' + node.nisPort;
+        return fetch(url + NODE_INFO_PATH, {method: 'GET', timeout: TIMEOUT})
+          .then(function(res){ return res.json(); })
+          .then(function(json) {
+            return {
+              ver: json['nisInfo']['version'],
+              upTime: json['nisInfo']['currentTime'] - json['nisInfo']['startTime']
+            }
+          })
+          .then(function(nodeInfo) {
+            return fetch(url + UNLOCKED_INFO_PATH, {method: 'POST', timeout: TIMEOUT})
+              .then(function(res){ return res.json(); })
+              .then(function(json) {
+                return {
+                  ver:  nodeInfo.ver,
+                  host: node.ip,
+                  freeSlots: json['max-unlocked'] - json['num-unlocked'],
+                  upTime: ~~(nodeInfo.upTime / 3600)
+                };
+              })
+            ;
+          })
+          .then(function(data) {
+            main.append(data);
+          })
+          .catch(function(data){ return false; })
+      });
+    })
+  ;
 }());
 </script>
 </body>
